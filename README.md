@@ -6,7 +6,7 @@ monitor. The AOC (`DP-2`) is never touched.
 ## Profile Tuner (recommended)
 
 ```bash
-cd ~/Projects/Personal/manual-callibration-tools
+cd ~/Projects/Personal/manual-calibration-tools
 python3 profile_tuner.py
 ```
 
