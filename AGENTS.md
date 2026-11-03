@@ -97,6 +97,15 @@ sudo apt install python3-gi gir1.2-gtk-3.0 x11-xserver-utils colord
 The runtime also needs `libX11.so.6` and `libXrandr.so.2`, normally present.
 No pip packages are required.
 
+After installing, run:
+
+```bash
+python3 check_deps.py
+```
+
+Treat any `[FAIL]` as a blocker. A `[WARN]` about the desktop colour manager
+means live preview may work but login persistence may not.
+
 The persistence path needs `colord` and a desktop colour manager that loads
 profiles. On Cinnamon this is `csd-color`; on GNOME it is `gsd-color`; KDE has
 `colord-kde`. Verify the manager is running before promising persistence.
@@ -157,6 +166,7 @@ by `colord`/the desktop colour manager.
 
 ## Code map
 
+- `check_deps.py` — preflight system/dependency report.
 - `monitors.py` — parse `xrandr --query`, detect internal/primary outputs.
 - `xrandr_gamma.py` — ctypes XRandR gamma LUT read/write.
   Important: use `XRRAllocGamma` for the setter. Separately allocated channel

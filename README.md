@@ -6,12 +6,126 @@ an ICC profile with a `vcgt` tag and assigns it through `colord`.
 
 It is an approximate visual tool, not a colorimeter.
 
-## Profile Tuner
+## Install
+
+### 1. Clone or enter the project
+
+```bash
+git clone <your-repo-url> manual-calibration-tools
+cd manual-calibration-tools
+```
+
+If it is already on your machine:
 
 ```bash
 cd ~/Projects/Personal/manual-calibration-tools
+```
+
+### 2. Install the system dependencies
+
+The tool uses system packages, not `pip`.
+
+**Debian / Ubuntu / Linux Mint**
+
+```bash
+sudo apt update
+sudo apt install python3-gi gir1.2-gtk-3.0 x11-xserver-utils colord libxrandr2 libx11-6
+```
+
+**Arch Linux**
+
+```bash
+sudo pacman -S python-gobject gtk3 xorg-xrandr colord libxrandr libx11
+```
+
+**Fedora**
+
+```bash
+sudo dnf install python3-gobject gtk3 xorg-x11-xrandr colord libXrandr libX11
+```
+
+Make sure the colord service is running:
+
+```bash
+sudo systemctl enable --now colord
+```
+
+You also need a desktop colour manager that applies display profiles:
+
+- Cinnamon: `csd-color` (included with Cinnamon)
+- GNOME: `gsd-color` (part of `gnome-settings-daemon`)
+- KDE: `colord-kde`
+
+### 3. Check the machine
+
+```bash
+python3 check_deps.py
+```
+
+A ready machine prints:
+
+```text
+[PASS] Python 3.12
+[PASS] X11 session
+[PASS] xrandr
+[PASS] libX11
+[PASS] libXrandr
+[PASS] PyGObject + GTK3
+[PASS] colord reports display devices
+[PASS] desktop colour manager: csd-color
+
+Result: ready. Run: python3 profile_tuner.py
+```
+
+If any line says `[FAIL]`, fix it using the troubleshooting table below before
+opening the GUI.
+
+### 4. Run it
+
+```bash
 python3 profile_tuner.py
 ```
+
+The **Target display** dropdown lists every connected output. It defaults to
+the internal panel, then the primary output. You can also select explicitly:
+
+```bash
+python3 profile_tuner.py --output eDP-1
+python3 profile_tuner.py --output DP-2
+```
+
+### X11 only
+
+This tool requires an **X11/Xorg** session. It does not work on native Wayland.
+On a Wayland desktop, log out and choose an “Xorg” or “Cinnamon on X11” session
+at the login screen.
+
+### AI agent quick start
+
+1. Read [AGENTS.md](AGENTS.md).
+2. Run `python3 check_deps.py`.
+3. Inspect displays with `xrandr --query` and `colormgr get-devices`.
+4. Run `python3 profile_tuner.py --output <output>`.
+5. If the native EDID profile is not found, pass `--source-profile`.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `No module named 'gi'` | Install `python3-gi`. |
+| `Namespace Gtk not available` | Install `gir1.2-gtk-3.0`. |
+| `xrandr: command not found` | Install `x11-xserver-utils` (Debian/Mint), `xorg-xrandr` (Arch), or `xorg-x11-xrandr` (Fedora). |
+| `libXrandr` not found | Install `libxrandr2` or `libXrandr`. |
+| `colormgr: command not found` | Install `colord`, then `sudo systemctl enable --now colord`. |
+| `colord reports no display devices` | Log into a graphical X11 session; ensure colord is running. |
+| `no known desktop colour manager` | Enable `csd-color`, `gsd-color`, or `colord-kde` for your desktop. Live preview may work, but login persistence may not. |
+| `output ... is not connected` | Run `xrandr --query` and use the exact output name with `--output`. |
+| `no EDID profile found` | Pass `--source-profile /path/to/edid-profile.icc`; do not use a profile that already has a `vcgt` tag. |
+| GUI opens but the screen does nothing | Check `XDG_SESSION_TYPE`; use X11, not Wayland. |
+| Profile does not survive logout | Check the desktop colour manager and `colormgr device-get-default-profile`. |
+| Permission or display error | Do not run the GUI with `sudo`; run it as your logged-in user. |
+
+## Profile Tuner
 
 The **Target display** dropdown lists every connected output. It defaults to the
 internal panel, then the primary output. You can also select explicitly:
