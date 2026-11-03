@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Per-channel profile tuner for the eDP-1 laptop panel.
+"""Per-channel profile tuner for a selected XRandR display.
 
 The preview writes the XRandR gamma LUT directly. Saving snapshots that exact
 LUT into an ICC profile with a VCGT tag and assigns it through colord.
@@ -7,7 +7,9 @@ LUT into an ICC profile with a VCGT tag and assigns it through colord.
 
 from __future__ import annotations
 
+import argparse
 import os
+import re
 import subprocess
 import sys
 
@@ -17,13 +19,21 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk  # noqa: E402
 
 import make_profile  # noqa: E402
+import monitors  # noqa: E402
 import profile_install  # noqa: E402
 import xrandr_gamma  # noqa: E402
 from laptop_color_tuner import TestPatternWindow, get_output_geometry  # noqa: E402
 
-OUTPUT = "eDP-1"
-PROFILE_PATH = os.path.expanduser("~/.local/share/icc/laptop-color-reference.icc")
+DEFAULT_OUTPUT = "eDP-1"
 IDENTITY_CTM = "0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1"
+
+
+def profile_path_for(output: str) -> str:
+    legacy = os.path.expanduser("~/.local/share/icc/laptop-color-reference.icc")
+    if output == DEFAULT_OUTPUT and os.path.exists(legacy):
+        return legacy
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", output)
+    return os.path.expanduser(f"~/.local/share/icc/manual-calibration-{safe}.icc")
 
 
 def identity_lut(size: int = 1024) -> list[int]:
@@ -96,19 +106,22 @@ class CurveView(Gtk.DrawingArea):
 
 
 class ProfileTuner(Gtk.Window):
-    def __init__(self) -> None:
-        super().__init__(title="Laptop Profile Tuner")
+    def __init__(self, output: str, source_profile: str | None = None) -> None:
+        super().__init__(title="Display Profile Tuner")
         self.set_border_width(12)
-        self.set_default_size(700, 760)
+        self.set_default_size(700, 800)
         self.set_resizable(False)
 
+        self.output = output
+        self.source_profile = source_profile
+        self.profile_path = profile_path_for(output)
         self._updating = False
         self._pending: int | None = None
         self._test_window: TestPatternWindow | None = None
         self.controls: dict[str, tuple[Gtk.Scale, Gtk.Label]] = {}
 
         try:
-            self.baseline = xrandr_gamma.get_lut(OUTPUT)
+            self.baseline = xrandr_gamma.get_lut(self.output)
         except Exception:
             neutral = identity_lut()
             self.baseline = (neutral, neutral[:], neutral[:])
@@ -119,20 +132,37 @@ class ProfileTuner(Gtk.Window):
         self.add(outer)
 
         heading = Gtk.Label()
-        heading.set_markup("<b>Laptop Profile Tuner</b>")
+        heading.set_markup("<b>Display Profile Tuner</b>")
         heading.set_xalign(0)
         outer.pack_start(heading, False, False, 0)
 
         subtitle = Gtk.Label(
             label=(
-                "Live preview is written directly to eDP-1's gamma LUT. "
-                "Save & Apply snapshots it into the ICC profile."
+                "Live preview is written directly to the selected display's gamma "
+                "LUT. Save & Apply snapshots it into that display's ICC profile."
             )
         )
         subtitle.set_xalign(0)
         subtitle.set_line_wrap(True)
         subtitle.set_max_width_chars(78)
         outer.pack_start(subtitle, False, False, 0)
+
+        selector_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        selector_label = Gtk.Label(label="Target display:")
+        selector_row.pack_start(selector_label, False, False, 0)
+        self.output_combo = Gtk.ComboBoxText()
+        for monitor in monitors.list_monitors():
+            self.output_combo.append(monitor.name, monitor.label())
+        self.output_combo.set_active_id(self.output)
+        self.output_combo.connect("changed", self.on_output_changed)
+        selector_row.pack_start(self.output_combo, True, True, 0)
+        outer.pack_start(selector_row, False, False, 0)
+
+        self.target_label = Gtk.Label(label=f"Profile: {self.profile_path}")
+        self.target_label.set_xalign(0)
+        self.target_label.set_line_wrap(True)
+        self.target_label.set_max_width_chars(78)
+        outer.pack_start(self.target_label, False, False, 0)
 
         notebook = Gtk.Notebook()
         notebook.set_size_request(-1, 370)
@@ -234,7 +264,7 @@ class ProfileTuner(Gtk.Window):
     def _reset_ctm(self) -> None:
         try:
             subprocess.run(
-                ["xrandr", "--output", OUTPUT, "--set", "CTM", IDENTITY_CTM],
+                ["xrandr", "--output", self.output, "--set", "CTM", IDENTITY_CTM],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -303,15 +333,46 @@ class ProfileTuner(Gtk.Window):
         self._pending = None
         luts = self.compute_luts()
         try:
-            xrandr_gamma.set_lut(OUTPUT, *luts)
+            xrandr_gamma.set_lut(self.output, *luts)
         except Exception as exc:
             self.set_status(f"ERROR: {exc}")
             return False
         self.curve.set_luts(*luts)
-        self.set_status("Live preview applied to eDP-1")
+        self.set_status(f"Live preview applied to {self.output}")
         return False
 
-    def on_reset(self, _button: Gtk.Button) -> None:
+    def on_output_changed(self, _combo: Gtk.ComboBoxText) -> None:
+        if self._updating:
+            return
+        new_output = self.output_combo.get_active_id()
+        if not new_output or new_output == self.output:
+            return
+
+        if self._test_window is not None:
+            self._test_window.destroy()
+            self._test_window = None
+
+        try:
+            xrandr_gamma.set_lut(self.output, *self.baseline)
+        except Exception:
+            pass
+
+        self.output = new_output
+        self.source_profile = None
+        self.profile_path = profile_path_for(new_output)
+        self.target_label.set_text(f"Profile: {self.profile_path}")
+        self._reset_ctm()
+
+        try:
+            self.baseline = xrandr_gamma.get_lut(self.output)
+        except Exception:
+            neutral = identity_lut()
+            self.baseline = (neutral, neutral[:], neutral[:])
+
+        self.on_reset(None)
+        self.set_status(f"Target display: {self.output}")
+
+    def on_reset(self, _button: Gtk.Button | None) -> None:
         self._updating = True
         for key, (scale, value_label) in self.controls.items():
             default = 0.0 if key in {"temperature", "tint"} else 1.0
@@ -326,7 +387,7 @@ class ProfileTuner(Gtk.Window):
         if self._test_window is not None:
             self._test_window.present()
             return
-        self._test_window = TestPatternWindow(self)
+        self._test_window = TestPatternWindow(self, self.output)
         self._test_window.connect("destroy", self.on_test_destroyed)
         self._test_window.show_all()
         self._test_window.present()
@@ -337,32 +398,35 @@ class ProfileTuner(Gtk.Window):
     def on_save(self, _button: Gtk.Button) -> None:
         luts = self.compute_luts()
         try:
-            with open(make_profile.SOURCE_PROFILE, "rb") as handle:
+            source_path = make_profile.source_profile_for(
+                self.output, self.source_profile
+            )
+            with open(source_path, "rb") as handle:
                 source = handle.read()
             profile = make_profile.build_profile_from_luts(source, *luts)
-            os.makedirs(os.path.dirname(PROFILE_PATH), exist_ok=True)
-            with open(PROFILE_PATH, "wb") as handle:
+            os.makedirs(os.path.dirname(self.profile_path), exist_ok=True)
+            with open(self.profile_path, "wb") as handle:
                 handle.write(profile)
-            profile_install.install_profile(PROFILE_PATH, OUTPUT)
-            xrandr_gamma.set_lut(OUTPUT, *luts)
+            profile_install.install_profile(self.profile_path, self.output)
+            xrandr_gamma.set_lut(self.output, *luts)
         except Exception as exc:
             self.set_status(f"ERROR: {exc}")
             return
         self.baseline = luts
-        self.set_status(f"Saved and applied profile: {PROFILE_PATH}")
+        self.set_status(f"Saved and applied profile: {self.profile_path}")
 
     def on_destroy(self, _widget: Gtk.Widget) -> None:
         if self._pending is not None:
             GLib.source_remove(self._pending)
             self._pending = None
         try:
-            xrandr_gamma.set_lut(OUTPUT, *self.baseline)
+            xrandr_gamma.set_lut(self.output, *self.baseline)
         except Exception:
             pass
         Gtk.main_quit()
 
     def place_main_window(self) -> bool:
-        x, y, width, height = get_output_geometry()
+        x, y, width, height = get_output_geometry(self.output)
         win_width, win_height = self.get_size()
         self.move(
             x + max(20, (width - win_width) // 2),
@@ -372,7 +436,24 @@ class ProfileTuner(Gtk.Window):
 
 
 def main() -> int:
-    window = ProfileTuner()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output",
+        help="XRandR output to calibrate (default: internal/primary display)",
+    )
+    parser.add_argument(
+        "--source-profile",
+        help="native EDID ICC profile to use as the colorimetric base",
+    )
+    args = parser.parse_args()
+
+    try:
+        output = monitors.resolve_output(args.output)
+    except (RuntimeError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    window = ProfileTuner(output, args.source_profile)
     window.show_all()
     GLib.timeout_add(150, window.place_main_window)
     Gtk.main()

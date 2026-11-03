@@ -11,7 +11,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import struct
+import subprocess
 import sys
 
 SOURCE_PROFILE = os.path.expanduser(
@@ -21,6 +23,47 @@ SAVED_REFERENCE = os.path.expanduser("~/.config/laptop-color-tuner/last.json")
 OUTPUT_PROFILE = os.path.expanduser("~/.local/share/icc/laptop-color-reference.icc")
 
 VCGT_ENTRIES = 256
+
+
+def find_native_profile(output: str) -> str | None:
+    """Find the EDID-derived profile for an XRandR output via colord."""
+    try:
+        result = subprocess.run(
+            ["colormgr", "get-devices"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+
+    for block in result.stdout.split("\n\n"):
+        if f"XRANDR_name={output}" not in block:
+            continue
+        filenames = re.findall(r"^\s+(/\S+\.icc)\s*$", block, re.MULTILINE)
+        md5_match = re.search(r"OutputEdidMd5=([0-9a-fA-F]+)", block)
+        if md5_match:
+            target = f"edid-{md5_match.group(1).lower()}.icc"
+            for filename in filenames:
+                if os.path.basename(filename) == target:
+                    return filename
+        for filename in filenames:
+            if os.path.basename(filename).startswith("edid-"):
+                return filename
+    return None
+
+
+def source_profile_for(output: str, explicit: str | None = None) -> str:
+    if explicit:
+        return os.path.expanduser(explicit)
+    native = find_native_profile(output)
+    if native:
+        return native
+    raise ValueError(
+        f"no EDID profile found for {output!r}; pass --source-profile explicitly"
+    )
 
 
 def make_vcgt_from_luts(

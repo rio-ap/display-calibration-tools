@@ -169,8 +169,8 @@ class ColorPatch(Gtk.DrawingArea):
 
 
 class TestPatternWindow(Gtk.Window):
-    def __init__(self, parent: Gtk.Window) -> None:
-        super().__init__(title="Laptop test pattern")
+    def __init__(self, parent: Gtk.Window, output: str = OUTPUT) -> None:
+        super().__init__(title="Display test pattern")
         self.set_transient_for(parent)
         self.set_decorated(False)
         self.set_resizable(False)
@@ -180,7 +180,7 @@ class TestPatternWindow(Gtk.Window):
         self.set_can_focus(True)
         self.connect("key-press-event", self.on_key_press)
 
-        x, y, width, height = get_output_geometry()
+        x, y, width, height = get_output_geometry(output)
         self.set_default_size(width, height)
         self.move(x, y)
 

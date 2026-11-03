@@ -1,17 +1,32 @@
-# Laptop Color Tuner
+# Manual Calibration Tools
 
-Tools for visually tuning the **eDP-1 laptop panel** against the AOC reference
-monitor. The AOC (`DP-2`) is never touched.
+Manual, per-display colour tuning for Linux/X11. The Profile Tuner applies
+adjustments live to one XRandR output, then snapshots the exact gamma LUT into
+an ICC profile with a `vcgt` tag and assigns it through `colord`.
 
-## Profile Tuner (recommended)
+It is an approximate visual tool, not a colorimeter.
+
+## Profile Tuner
 
 ```bash
 cd ~/Projects/Personal/manual-calibration-tools
 python3 profile_tuner.py
 ```
 
-This is the per-channel profile editor. It applies adjustments live to the
-laptop's XRandR gamma LUT and can snapshot the exact result into an ICC profile.
+The **Target display** dropdown lists every connected output. It defaults to the
+internal panel, then the primary output. You can also select explicitly:
+
+```bash
+python3 profile_tuner.py --output eDP-1
+python3 profile_tuner.py --output DP-2
+```
+
+Each display gets its own profile file:
+
+- `eDP-1` keeps `~/.local/share/icc/laptop-color-reference.icc` if it already
+  exists.
+- Other outputs use
+  `~/.local/share/icc/manual-calibration-<sanitized-output>.icc`.
 
 ### Basic tab
 
@@ -30,19 +45,21 @@ laptop's XRandR gamma LUT and can snapshot the exact result into an ICC profile.
 
 ### Buttons
 
-- **Reset** — restores the saved profile's LUT.
-- **Test Pattern** — laptop-only white/gray/red/green/blue/`#a10f0f` patches.
-  Press **Esc** or click **Close** to dismiss.
-- **Save & Apply Profile** — snapshots the current LUT into:
+- **Reset** — restores the selected display's saved profile LUT.
+- **Test Pattern** — opens white/gray/red/green/blue/`#a10f0f` patches on the
+  selected display. Press **Esc** or click **Close** to dismiss.
+- **Save & Apply Profile** — snapshots the current LUT into the selected
+  display's ICC profile and assigns it through `colord`.
 
-  ```text
-  ~/.local/share/icc/laptop-color-reference.icc
-  ```
+Closing the window restores the last saved LUT. No autostart script is used; the
+desktop colour manager (`csd-color`, `gsd-color`, or `colord-kde`) applies the
+assigned profile at login.
 
-  and assigns it to `eDP-1` through `colord`.
+## AI agent guide
 
-Closing the window restores the last saved profile LUT. No autostart script is
-used; `colord` / `csd-color` applies the assigned profile at login.
+See [AGENTS.md](AGENTS.md) for a machine-by-machine adaptation procedure:
+inspecting the session, finding the target output, discovering the native EDID
+profile, installing dependencies, verifying persistence, and safety rules.
 
 ## Legacy CTM tuner
 
@@ -59,28 +76,25 @@ stored in the profile and survives without a startup script.
 python3 make_profile.py
 ```
 
-## Notes
-
-This is an approximate visual tool, not a colorimeter calibration. A standard
-display profile/VCGT can represent per-channel gain, gamma, and black-level
-curves. It cannot represent cross-channel saturation or hue changes; those need
-a 3D LUT or the XRandR CTM path.
+This legacy builder is aimed at the original `eDP-1` setup. Use the GUI for other
+outputs.
 
 ## Portability
 
 Tested on Linux Mint 22.3 Cinnamon, X11, Intel graphics, with an AOC 22B2WG5 as
 the reference display.
 
-Current assumptions that need changing before this is universal:
+Current requirements:
 
-- The output name is hardcoded as `eDP-1`.
-- The source EDID profile is hardcoded to this laptop's
-  `edid-1eec840f5baccc8e533ba13fc2fb3e33.icc`.
-- It requires X11 + XRandR gamma support. It does not work on a native Wayland
-  session.
-- It uses `colord` and `csd-color` to persist the profile. Other desktops need a
-  compatible color manager.
-- It needs Python 3 with PyGObject/GTK3.
+- Linux with an X11 session and XRandR gamma support
+- `colord` plus a desktop colour manager that applies display profiles
+- Python 3 with PyGObject/GTK3
+- `xrandr` and `libXrandr.so.2`
 
-The core XRandR LUT code is portable across Linux X11 systems once the output
-name and source profile are configurable.
+Output selection and native EDID profile discovery are automatic, with
+`--output` and `--source-profile` overrides. Native Wayland, macOS, and Windows
+are not supported. A standard display VCGT profile is per-channel; it cannot
+represent cross-channel saturation or hue changes.
+
+Generated profiles are unit-specific. Do not share one as a universal profile
+for another panel.
