@@ -30,6 +30,15 @@ python3 laptop_color_tuner.py
 
 Closing the window resets `eDP-1` to identity. The saved JSON remains.
 
+## Reapply at login
+
+`apply_saved.py` reads `last.json` and reapplies the saved matrix to `eDP-1`.
+It is installed as `~/.local/bin/laptop-color-apply` and started by
+`~/.config/autostart/laptop-color-reference.desktop`.
+
+The script retries briefly while Cinnamon is setting up the displays, and logs
+to `~/.config/laptop-color-tuner/apply.log`.
+
 ## Notes
 
 This is an approximate visual tool, not a colorimeter calibration. The matrix is
