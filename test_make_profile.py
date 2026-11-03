@@ -50,6 +50,15 @@ class ProfileTests(unittest.TestCase):
         profile[84:100] = b"\x00" * 16
         self.assertEqual(stored, hashlib.md5(profile).digest())
 
+    def test_build_profile_from_1024_entry_luts(self):
+        with open(make_profile.SOURCE_PROFILE, "rb") as handle:
+            source = handle.read()
+        lut = [round(index * 65535 / 1023) for index in range(1024)]
+        profile = make_profile.build_profile_from_luts(source, lut, lut, lut)
+        tags = dict(make_profile.parse_tags(profile))
+        self.assertEqual(len(tags[b"vcgt"]), 18 + 3 * 1024 * 2)
+        self.assertEqual(struct.unpack(">H", tags[b"vcgt"][14:16])[0], 1024)
+
 
 class SavedReferenceTests(unittest.TestCase):
     def test_rejects_non_unit_saturation(self):

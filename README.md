@@ -1,58 +1,67 @@
 # Laptop Color Tuner
 
-Small GTK3 tool for visually tuning the **eDP-1 laptop panel** against the AOC
-reference monitor.
+Tools for visually tuning the **eDP-1 laptop panel** against the AOC reference
+monitor. The AOC (`DP-2`) is never touched.
 
-It applies a temporary 3x3 colour matrix through XRandR to `eDP-1` only. The AOC
-(`DP-2`) is never touched.
-
-## Run
+## Profile Tuner (recommended)
 
 ```bash
 cd ~/laptop-color-tuner
-python3 laptop_color_tuner.py
+python3 profile_tuner.py
 ```
 
-## Controls
+This is the per-channel profile editor. It applies adjustments live to the
+laptop's XRandR gamma LUT and can snapshot the exact result into an ICC profile.
 
-- **Red / Green / Blue gain** — shifts the white balance of the laptop panel.
-- **Saturation** — makes colours more or less saturated; use small changes.
-- **Reset** — restores the identity matrix.
-- **Test Pattern** — opens a laptop-only pattern with white, gray, red, green,
-  blue, and the wallpaper's `#a10f0f` patch. Press **Esc** or click **Close** to
-  dismiss it.
-- **Save Reference** — writes the current gains, saturation, matrix, and
-  raw CTM values to:
+### Basic tab
 
+- Temperature
+- Tint
+- Brightness
+- Contrast
+- Gamma
+
+### Advanced tab
+
+- Red / green / blue gain
+- Red / green / blue gamma
+- Red / green / blue black lift
+- Gamma curve preview
+
+### Buttons
+
+- **Reset** — restores the saved profile's LUT.
+- **Test Pattern** — laptop-only white/gray/red/green/blue/`#a10f0f` patches.
+  Press **Esc** or click **Close** to dismiss.
+- **Save & Apply Profile** — snapshots the current LUT into:
+
+  ```text
+  ~/.local/share/icc/laptop-color-reference.icc
   ```
-  ~/.config/laptop-color-tuner/last.json
-  ```
 
-Closing the window resets `eDP-1` to identity. The saved JSON remains.
+  and assigns it to `eDP-1` through `colord`.
 
-## Generate the persistent profile
+Closing the window restores the last saved profile LUT. No autostart script is
+used; `colord` / `csd-color` applies the assigned profile at login.
 
-`make_profile.py` reads the saved gains from `last.json` and writes a synthetic
-ICC profile with a VCGT calibration table:
+## Legacy CTM tuner
+
+`laptop_color_tuner.py` is the earlier 3-slider CTM tool. It is kept for
+reference, but `profile_tuner.py` is the better path because its result can be
+stored in the profile and survives without a startup script.
+
+## Profile builder
+
+`make_profile.py` can also generate a profile directly from the saved gains in
+`~/.config/laptop-color-tuner/last.json`:
 
 ```bash
-cd ~/laptop-color-tuner
 python3 make_profile.py
 ```
 
-The profile is written to:
-
-```text
-~/.local/share/icc/laptop-color-reference.icc
-```
-
-It is assigned to `eDP-1` through `colord`; `csd-color` applies its gamma table
-at login. No autostart script is used.
-
 ## Notes
 
-This is an approximate visual tool, not a colorimeter calibration. The matrix is
-applied in the display pipeline without a measured profile, so large changes can
-distort colours. The generated profile can represent per-channel gain/gamma
-corrections; cross-channel matrices and saturation boosts cannot be represented
-in a standard display VCGT profile.
+This is an approximate visual tool, not a colorimeter calibration. A standard
+display profile/VCGT can represent per-channel gain, gamma, and black-level
+curves. It cannot represent cross-channel saturation or hue changes; those need
+a 3D LUT or the XRandR CTM path.

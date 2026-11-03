@@ -23,21 +23,41 @@ OUTPUT_PROFILE = os.path.expanduser("~/.local/share/icc/laptop-color-reference.i
 VCGT_ENTRIES = 256
 
 
-def make_vcgt(red: float, green: float, blue: float) -> bytes:
-    """Create an Apple/ICC vcgt table with per-channel linear gain curves."""
+def make_vcgt_from_luts(
+    red: list[int],
+    green: list[int],
+    blue: list[int],
+) -> bytes:
+    """Create an Apple/ICC vcgt table from three complete channel LUTs."""
+    entries = len(red)
+    if not (len(green) == entries and len(blue) == entries):
+        raise ValueError("all LUTs must have the same length")
+    if entries < 2:
+        raise ValueError("a LUT needs at least two entries")
     header = (
         b"vcgt"
         + b"\x00" * 4
         + struct.pack(">I", 0)  # table type
-        + struct.pack(">HHH", 3, VCGT_ENTRIES, 2)  # channels, entries, entry size
+        + struct.pack(">HHH", 3, entries, 2)  # channels, entries, entry size
     )
     body = bytearray()
-    for gain in (red, green, blue):
-        for index in range(VCGT_ENTRIES):
-            value = int(round(gain * (index / (VCGT_ENTRIES - 1)) * 65535))
-            value = max(0, min(65535, value))
-            body.extend(struct.pack(">H", value))
+    for channel in (red, green, blue):
+        for value in channel:
+            body.extend(struct.pack(">H", max(0, min(65535, int(value)))))
     return header + bytes(body)
+
+
+def make_vcgt(red: float, green: float, blue: float) -> bytes:
+    """Create an Apple/ICC vcgt table with per-channel linear gain curves."""
+    luts = []
+    for gain in (red, green, blue):
+        luts.append(
+            [
+                max(0, min(65535, int(round(gain * (index / (VCGT_ENTRIES - 1)) * 65535))))
+                for index in range(VCGT_ENTRIES)
+            ]
+        )
+    return make_vcgt_from_luts(*luts)
 
 
 def parse_tags(data: bytes) -> list[tuple[bytes, bytes]]:
@@ -85,6 +105,17 @@ def rebuild_profile(source: bytes, tags: list[tuple[bytes, bytes]]) -> bytes:
 def build_profile(source: bytes, red: float, green: float, blue: float) -> bytes:
     tags = [(sig, data) for sig, data in parse_tags(source) if sig != b"vcgt"]
     tags.append((b"vcgt", make_vcgt(red, green, blue)))
+    return rebuild_profile(source, tags)
+
+
+def build_profile_from_luts(
+    source: bytes,
+    red: list[int],
+    green: list[int],
+    blue: list[int],
+) -> bytes:
+    tags = [(sig, data) for sig, data in parse_tags(source) if sig != b"vcgt"]
+    tags.append((b"vcgt", make_vcgt_from_luts(red, green, blue)))
     return rebuild_profile(source, tags)
 
 
