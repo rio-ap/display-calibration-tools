@@ -1,8 +1,12 @@
-# Manual Calibration Tools
+# Display Calibration Tools
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Manual, per-display colour tuning for Linux/X11. The Profile Tuner applies
 adjustments live to one XRandR output, then snapshots the exact gamma LUT into
 an ICC profile with a `vcgt` tag and assigns it through `colord`.
+
+Repository: <https://github.com/rio-ap/display-calibration-tools>
 
 It is an approximate visual tool, not a colorimeter.
 
@@ -11,14 +15,14 @@ It is an approximate visual tool, not a colorimeter.
 ### 1. Clone or enter the project
 
 ```bash
-git clone <your-repo-url> manual-calibration-tools
-cd manual-calibration-tools
+git clone https://github.com/rio-ap/display-calibration-tools.git
+cd display-calibration-tools
 ```
 
 If it is already on your machine:
 
 ```bash
-cd ~/Projects/Personal/manual-calibration-tools
+cd ~/Projects/Personal/display-calibration-tools
 ```
 
 ### 2. Install the system dependencies
@@ -212,3 +216,7 @@ represent cross-channel saturation or hue changes.
 
 Generated profiles are unit-specific. Do not share one as a universal profile
 for another panel.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

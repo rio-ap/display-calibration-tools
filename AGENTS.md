@@ -113,7 +113,7 @@ profiles. On Cinnamon this is `csd-color`; on GNOME it is `gsd-color`; KDE has
 ## Phase 5: run and tune
 
 ```bash
-cd ~/Projects/Personal/manual-calibration-tools
+cd ~/Projects/Personal/display-calibration-tools
 python3 profile_tuner.py
 ```
 

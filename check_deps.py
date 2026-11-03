@@ -112,7 +112,7 @@ def main() -> int:
     checks.append(_check_colord())
     checks.append(_check_color_manager())
 
-    print("Manual Calibration Tools — dependency check\n")
+    print("Display Calibration Tools — dependency check\n")
     failures = 0
     for status, message in checks:
         if status == FAIL:
