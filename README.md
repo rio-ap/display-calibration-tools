@@ -22,7 +22,7 @@ cd display-calibration-tools
 If it is already on your machine:
 
 ```bash
-cd ~/Projects/Personal/display-calibration-tools
+cd /path/to/display-calibration-tools
 ```
 
 ### 2. Install the system dependencies
