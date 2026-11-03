@@ -30,18 +30,29 @@ python3 laptop_color_tuner.py
 
 Closing the window resets `eDP-1` to identity. The saved JSON remains.
 
-## Reapply at login
+## Generate the persistent profile
 
-`apply_saved.py` reads `last.json` and reapplies the saved matrix to `eDP-1`.
-It is installed as `~/.local/bin/laptop-color-apply` and started by
-`~/.config/autostart/laptop-color-reference.desktop`.
+`make_profile.py` reads the saved gains from `last.json` and writes a synthetic
+ICC profile with a VCGT calibration table:
 
-The script retries briefly while Cinnamon is setting up the displays, and logs
-to `~/.config/laptop-color-tuner/apply.log`.
+```bash
+cd ~/laptop-color-tuner
+python3 make_profile.py
+```
+
+The profile is written to:
+
+```text
+~/.local/share/icc/laptop-color-reference.icc
+```
+
+It is assigned to `eDP-1` through `colord`; `csd-color` applies its gamma table
+at login. No autostart script is used.
 
 ## Notes
 
 This is an approximate visual tool, not a colorimeter calibration. The matrix is
 applied in the display pipeline without a measured profile, so large changes can
-distort colours. Use it to find a reference setting, then persist that setting
-with a startup script or a proper ICC/VCGT calibration.
+distort colours. The generated profile can represent per-channel gain/gamma
+corrections; cross-channel matrices and saturation boosts cannot be represented
+in a standard display VCGT profile.
