@@ -6,7 +6,7 @@ monitor. The AOC (`DP-2`) is never touched.
 ## Profile Tuner (recommended)
 
 ```bash
-cd ~/laptop-color-tuner
+cd ~/Projects/Personal/manual-callibration-tools
 python3 profile_tuner.py
 ```
 
@@ -65,3 +65,22 @@ This is an approximate visual tool, not a colorimeter calibration. A standard
 display profile/VCGT can represent per-channel gain, gamma, and black-level
 curves. It cannot represent cross-channel saturation or hue changes; those need
 a 3D LUT or the XRandR CTM path.
+
+## Portability
+
+Tested on Linux Mint 22.3 Cinnamon, X11, Intel graphics, with an AOC 22B2WG5 as
+the reference display.
+
+Current assumptions that need changing before this is universal:
+
+- The output name is hardcoded as `eDP-1`.
+- The source EDID profile is hardcoded to this laptop's
+  `edid-1eec840f5baccc8e533ba13fc2fb3e33.icc`.
+- It requires X11 + XRandR gamma support. It does not work on a native Wayland
+  session.
+- It uses `colord` and `csd-color` to persist the profile. Other desktops need a
+  compatible color manager.
+- It needs Python 3 with PyGObject/GTK3.
+
+The core XRandR LUT code is portable across Linux X11 systems once the output
+name and source profile are configurable.
